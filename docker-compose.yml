@@ -1,0 +1,11 @@
+services:
+  pyimax:
+    build: .
+    image: pyimax:latest
+    container_name: pyimax-container
+    command: /bin/bash
+    volumes:
+      - type: bind
+        source: ./src
+        target: /workspace/pyimax
+    tty: true

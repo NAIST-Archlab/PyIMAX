@@ -10,6 +10,7 @@ RUN pip install --upgrade pip && \
     /bin/bash ./setup_vscode_setting.sh
 
 RUN pip install /src/pyimax
+RUN pip install numpy
 
 WORKDIR /workspace/pyimax
 

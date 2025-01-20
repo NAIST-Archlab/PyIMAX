@@ -1,10 +1,13 @@
 #pragma once
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
+#include <iostream>
 #include <vector>
 #include <cstdint>
 #include <stdexcept>
+#include "imax_utils.h"
 
+#define PYBIND11_DETAILED_ERROR_MESSAGE
 namespace py = pybind11;
 
 class IMAXArray {
@@ -41,8 +44,10 @@ public:
         }
 
         // グローバルアドレスから割り当て (シミュレーション)
+        memory_align(56);
         device_ptr = global_memory_addr;
-        global_memory_addr += nbytes;
+        xmax_bzero((Uint *)device_ptr, imax_nbytes);
+        global_memory_addr += imax_nbytes;
 
         // host_data は初期状態では空 (py::array() により初期化)
         host_data = py::array();
@@ -76,11 +81,13 @@ public:
 
     /// スタティックメソッド: IMAXArray から NumPy 配列に転送 (ホスト側のデータコピーを返す)
     static py::array to_numpy(const IMAXArray &imax) {
-        if (imax.host_data) {
-            return imax.host_data.attr("copy")();
-        } else {
-            return py::array(py::dtype(imax.dtype), imax.shape);
-        }
+        py::dtype dtype(imax.dtype);
+        py::array new_data(dtype, imax.shape);
+        
+        py::buffer_info info = new_data.request();
+        std::memcpy(info.ptr, (void *) imax.device_ptr, imax.nbytes);
+
+        return new_data;
     }
 
     /// インスタンスメソッド: 自身のデータを NumPy 配列に転送
@@ -90,6 +97,31 @@ public:
     void numpy_to_imax(py::array array);
 
     std::string repr() const;
+
+    IMAXArray mv(const IMAXArray &vector);
+private:
+    std::vector<ssize_t> imax_shape;      // 配列の形状
+    size_t imax_size;
+    size_t imax_nbytes;
+
+    void memory_align(int alignment) {
+        imax_shape = shape;
+
+        for (auto &s: imax_shape) {
+            ssize_t remainder = s % alignment;
+            if (remainder != 0) {
+                ssize_t padding = alignment - remainder;
+                s += padding;
+            }
+        }
+
+        imax_size = 1;
+        for (auto s: imax_shape) {
+            imax_size *= s;
+        }
+
+        imax_nbytes = imax_size * sizeof(float);
+    }
 };
 
 void init_imax(pybind11::module &m);

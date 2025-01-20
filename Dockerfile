@@ -1,7 +1,6 @@
 FROM python:3.9
 
-COPY ./pyimax /src/pyimax
-
+WORKDIR /src/pyimax
 COPY ./setup_vscode_setting.sh /src/pyimax
 
 RUN pip install --upgrade pip && \
@@ -9,8 +8,10 @@ RUN pip install --upgrade pip && \
     cd /src/pyimax && \
     /bin/bash ./setup_vscode_setting.sh
 
-RUN pip install /src/pyimax
 RUN pip install numpy
+
+COPY ./pyimax /src/pyimax
+RUN pip install /src/pyimax
 
 WORKDIR /workspace/pyimax
 

@@ -13,9 +13,9 @@ void imax_mv(unsigned char* values, unsigned char* keys, unsigned char* query, s
     float *imax_query_array = (float*) query;
     float *imax_result_array = (float*) values;
 
-    printf("imax_search_mv: imax_emb=%d, imax_size=%d\n", imax_emb, imax_size);
-    printf("imax_search_mv: imax_query_array=%p, imax_key_array=%p, imax_result_array=%p\n", imax_query_array, imax_key_array, imax_result_array);
-
+    // printf("imax_search_mv: imax_emb=%d, imax_size=%d\n", imax_emb, imax_size);
+    // printf("imax_search_mv: imax_query_array=%p, imax_key_array=%p, imax_result_array=%p\n", imax_query_array, imax_key_array, imax_result_array);
+    printf("imax_mv: qty=%d, size=%d, threadId=%d\n", qty, size, threadId);
     int imax_kernel_row_size = (256*1024)/imax_emb;
     if (imax_kernel_row_size < imax_size) {
         imax_kernel_row_size -= imax_kernel_row_size % imax_size;
@@ -23,7 +23,7 @@ void imax_mv(unsigned char* values, unsigned char* keys, unsigned char* query, s
         imax_kernel_row_size = imax_size;
     }
     for (int row_blk_idx = 0; row_blk_idx*imax_kernel_row_size < imax_size; row_blk_idx++) {
-        printf("row_blk_idx=%d\n", row_blk_idx);
+        // printf("row_blk_idx=%d\n", row_blk_idx);
         Ull qaddr[IMAX_KERNEL_COL_SIZE];
         Ull kaddr[IMAX_KERNEL_COL_SIZE*4];
         Ull raddr[4];
@@ -32,11 +32,15 @@ void imax_mv(unsigned char* values, unsigned char* keys, unsigned char* query, s
                 kaddr[j + k*4] = ((Ull)imax_key_array) + ((row_blk_idx*imax_kernel_row_size)+j)*imax_emb*4 + k*8;
             }
             qaddr[k] = ((Ull)imax_query_array) + k*8;
-            printf("kaddr[%d]: %p, %p, %p, %p\n", k, (void*)kaddr[k*4], (void*)kaddr[k*4+1], (void*)kaddr[k*4+2], (void*)kaddr[k*4+3]);
+            // printf("kaddr[%d]: %p, %p, %p, %p\n", k, (void*)kaddr[k*4], (void*)kaddr[k*4+1], (void*)kaddr[k*4+2], (void*)kaddr[k*4+3]);
+            // printf("kaddr_value[%d]: %f, %f, %f, %f\n", k, imax_key_array[(row_blk_idx*imax_kernel_row_size)+0 + k*4], imax_key_array[(row_blk_idx*imax_kernel_row_size)+1 + k*4], imax_key_array[(row_blk_idx*imax_kernel_row_size)+2 + k*4], imax_key_array[(row_blk_idx*imax_kernel_row_size)+3 + k*4]);
+            // printf("qaddr[%d]: %p\n", k, (void*)qaddr[k]);
+            // printf("qaddr_value[%d]: %f\n", k, imax_query_array[k]);
         }
         for (int j = 0; j < 4; j++) {
             raddr[j] = ((Ull)imax_result_array) + (imax_kernel_row_size*row_blk_idx)*4 + j*4;
-            printf("raddr[%d]: %p\n", j, (void*)raddr[j]);
+            // printf("raddr[%d]: %p\n", j, (void*)raddr[j]);
+            // printf("raddr_value[%d]: %f\n", j, imax_result_array[(imax_kernel_row_size*row_blk_idx)+j]);
         }
 
         Ull CHIP, LOLP, INIT0, INIT1, LOOP0, LOOP1;
@@ -74,6 +78,9 @@ void imax_mv(unsigned char* values, unsigned char* keys, unsigned char* query, s
                     mop(OP_STWR, 3, &AR[r][1], (Ull)oofs, (Ull)raddr[2], MSK_D0, (Ull)raddr[0], result_fetch_size, 0, 0, (Ull)NULL, result_fetch_size); \
                     mop(OP_STWR, 3, &AR[r][0], (Ull)oofs, (Ull)raddr[3], MSK_D0, (Ull)raddr[0], result_fetch_size, 0, 0, (Ull)NULL, result_fetch_size)
 
+        //printf("imax_kernel_row_size=%d\n", imax_kernel_row_size);
+        //printf("imax_emb=%d\n", imax_emb);
+        //printf("imax_emb/(IMAX_KERNEL_COL_SIZE*2)=%d\n", imax_emb/(IMAX_KERNEL_COL_SIZE*2));
 //EMAX5A begin mv1 mapdist=0
         for (CHIP=0;CHIP<NCHIP;CHIP++) {
             for (INIT1=1,LOOP1=imax_kernel_row_size/4,rofs=rofs_init;LOOP1--;INIT1=0) {
@@ -135,7 +142,8 @@ void imax_mv(unsigned char* values, unsigned char* keys, unsigned char* query, s
                     exe(OP_FAD, &AR[59][0], AR[58][0], EXP_H3232, AR[58][0], EXP_H1010, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
 
                     mv1_store(62, 59);
-                    printf("mv1_store: raddr[0]=%p, raddr[1]=%p, raddr[2]=%p, raddr[3]=%p\n", raddr[0], raddr[1], raddr[2], raddr[3]);
+                    // printf("mv1_store: raddr[0]=%p, raddr[1]=%p, raddr[2]=%p, raddr[3]=%p\n", raddr[0], raddr[1], raddr[2], raddr[3]);
+                    // printf("mv1 result: %f, %f, %f, %f\n", imax_result_array[(imax_kernel_row_size*row_blk_idx)+0], imax_result_array[(imax_kernel_row_size*row_blk_idx)+1], imax_result_array[(imax_kernel_row_size*row_blk_idx)+2], imax_result_array[(imax_kernel_row_size*row_blk_idx)+3]);
                 }
             }
         }
@@ -144,14 +152,14 @@ void imax_mv(unsigned char* values, unsigned char* keys, unsigned char* query, s
 //EMAX5A drain_dirty_lmm
 
     float minDist = INFINITY;
-    printf("IMAX Result: [");
-    for (int j = 1; j <= size; j++) {
-        float result = -imax_result_array[j-1];
-        printf("%f", result);
-        if (j < size) {
-            printf(", ");
-        }
-    }
-    printf("]\n");
-    printf("IMAX Done\n");
+    // printf("IMAX Result: [");
+    // for (int j = 1; j <= size; j++) {
+        // float result = -imax_result_array[j-1];
+        // printf("%f", result);
+        // if (j < size) {
+            // printf(", ");
+        // }
+    // }
+    // printf("]\n");
+    // printf("IMAX Done\n");
 }

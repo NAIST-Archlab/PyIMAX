@@ -44,7 +44,7 @@ public:
         }
 
         // グローバルアドレスから割り当て (シミュレーション)
-        memory_align(56);
+        memory_align(56*2);
         device_ptr = global_memory_addr;
         xmax_bzero((Uint *)device_ptr, imax_nbytes);
         global_memory_addr += imax_nbytes;
@@ -76,6 +76,22 @@ public:
 
         // シミュレーション：ホスト側のデータコピーを保持
         imax.host_data = array.attr("copy")();
+
+        py::buffer_info info_imax = imax.host_data.request();
+
+        // imaxサイズとnumpyサイズが違うので（メモリアラインメントのため）imax_sizeに合わせて値をコピー
+        for (size_t i = 0; i < imax.shape[0]; i++) {
+            if (shape_vec.size() == 1) {
+                float *p = (float *)imax.device_ptr;
+                p[i] = ((float*)info_imax.ptr)[i];
+            } else {
+                for (size_t j = 0; j < shape_vec[1]; j++) {
+                    float *p = (float *)imax.device_ptr;
+                    p[(i * imax.imax_shape[1]) + j] = ((float* )info_imax.ptr)[(i * imax.shape[1]) + j];
+                }
+            }
+        }
+
         return imax;
     }
 

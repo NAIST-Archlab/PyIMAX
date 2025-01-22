@@ -1,6 +1,7 @@
 from glob import glob
 from setuptools import setup
 import os
+import subprocess
 
 from pybind11.setup_helpers import Pybind11Extension, build_ext as build_ext_orig
 
@@ -13,6 +14,9 @@ cppfiles.extend(sorted(glob("src/*.cpp")))
 
 cfiles = []
 cfiles.extend(sorted(glob("src/*.c")))
+
+imax_files = []
+imax_files.extend(sorted(glob("src/imax/*.c")))
 
 ext_modules = [
     Pybind11Extension(
@@ -42,11 +46,28 @@ class CustomBuildExt(build_ext_orig):
         # 元のコンパイルコマンドに戻す
         self.compiler.compiler_so = orig_compiler_so
 
+        conv_mark_cmd = "./include/conv-mark/conv-mark" 
+        conv_c2d_cmd =  "./include/conv-c2d/conv-c2d-cent"
+
+        new_imax_files = []
+        for imax_file in imax_files:
+            with open(imax_file + '-mark.c', 'w') as fp:
+                subprocess.run([conv_mark_cmd, imax_file], stdout=fp)
+            with open(imax_file + '-cppo.c', 'w') as fp:
+                subprocess.run(['cpp', '-P', '-DEMAX7', '-DFPDDMA', '-DNO_EMAX7LIB_BODY', imax_file + '-mark.c'], stdout=fp)
+            subprocess.run([conv_c2d_cmd, imax_file + '-cppo.c'])
+            with open(imax_file.split('.')[0] + '-emax7.c', 'r') as fp:
+                print(fp.read())
+            new_imax_files.append(imax_file.split('.')[0] + '-emax7.c')
+
+        imax_objects = self.compiler.compile(new_imax_files, extra_postargs=["-lm", "-lpthread", "-fcommon"])
+
         for ext in self.extensions:
             if ext.name == __package__:
                 if ext.extra_objects is None:
                     ext.extra_objects = []
                 ext.extra_objects.extend(c_objects)
+                ext.extra_objects.extend(imax_objects)
         super().build_extensions()
 
 

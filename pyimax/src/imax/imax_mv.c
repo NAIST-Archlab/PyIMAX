@@ -1,5 +1,5 @@
-#include "../include/imax_mv.h"
-#include "../include/imax_utils.h"
+#include "../../include/imax_mv.h"
+#include "../../include/imax_utils.h"
 #include <stdio.h>
 
 #define IMAX_KERNEL_COL_SIZE 56

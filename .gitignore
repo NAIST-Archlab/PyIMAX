@@ -4,3 +4,11 @@
 *.so
 *.a
 log
+.venv
+pyimax.egg-info/
+*-emax7.c
+*-cppo.c*
+*-mark.c*
+*-emax7s*
+*.obj
+build/

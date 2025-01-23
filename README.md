@@ -18,3 +18,8 @@ source ./run.sh
 ```sh
 python -m pip install ./pyimax
 ```
+
+## How to clean up
+```sh
+python setup.py clean
+```

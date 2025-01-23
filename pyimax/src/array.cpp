@@ -3,8 +3,6 @@
 
 namespace py = pybind11;
 
-static const std::uintptr_t IMAX_GLOBAL_MEMORY_ADDR = 0x10000000;
-
 /// インスタンスメソッド: 自身のデータを NumPy 配列に転送
 py::array IMAXArray::imax_to_numpy() const {
     return IMAXArray::to_numpy(*this);
@@ -55,8 +53,11 @@ IMAXArray IMAXArray::mv(const IMAXArray &vector) {
 }
 
 // 初期グローバルメモリアドレスの設定
-// std::uintptr_t IMAXArray::global_memory_addr = IMAX_GLOBAL_BASE_ADDR;
+#ifdef ARMZYNQ
+std::uintptr_t IMAXArray::global_memory_addr = (std::uintptr_t) 0x0000050000000000LL;
+#else
 std::uintptr_t IMAXArray::global_memory_addr = (std::uintptr_t)(new char[100000]);
+#endif
 
 void init_imax_array(pybind11::module &m) {
     py::class_<IMAXArray>(m, "IMAXArray")

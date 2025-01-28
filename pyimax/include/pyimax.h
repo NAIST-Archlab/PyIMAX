@@ -18,6 +18,7 @@ public:
     size_t nbytes;                   // 総バイトサイズ
     std::string dtype;               // データ型 ("float32" など)
     py::array host_data;             // シミュレーション用にホスト側（NumPy 配列）のデータを保持
+    bool is_row_major;               // 行優先かどうか
 
     // クラス変数としてグローバルな次回割り当てアドレスを管理
     static std::uintptr_t global_memory_addr;
@@ -48,6 +49,7 @@ public:
         device_ptr = global_memory_addr;
         xmax_bzero((Uint *)device_ptr, imax_nbytes);
         global_memory_addr += imax_nbytes;
+        is_row_major = true;
 
         // host_data は初期状態では空 (py::array() により初期化)
         host_data = py::array();
@@ -115,6 +117,8 @@ public:
     std::string repr() const;
 
     IMAXArray mv(const IMAXArray &vector);
+
+    void change_major() const;
 private:
     std::vector<ssize_t> imax_shape;      // 配列の形状
     size_t imax_size;

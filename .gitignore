@@ -5,6 +5,8 @@
 *.a
 log
 .venv
+.venv_x86
+.venv_aarch64
 pyimax.egg-info/
 *-emax7.c
 *-cppo.c*

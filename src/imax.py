@@ -9,6 +9,8 @@ def main() -> None:
     b_i = IMAXArray.from_numpy(b)
     print(a_i)
     c_i = a_i.mv(b_i)
+    print(a_i)
+    print(b_i)
     print(c_i)
     print(IMAXArray.to_numpy(c_i))
 

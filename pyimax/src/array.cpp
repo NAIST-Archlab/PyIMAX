@@ -48,26 +48,29 @@ IMAXArray IMAXArray::mv(const IMAXArray &vector) {
     IMAXArray result({shape[0]}, dtype);
     std::cout << "IMAXArray::mv: shape[0]=" << shape[0] << ", shape[1]=" << shape[1] << std::endl;
     std::cout << "IMAXArray::mv imax_shape[0]=" << imax_shape[0] << ", imax_shape[1]=" << imax_shape[1] << std::endl;
-    if (this.is_row_major) {
-        this.change_major();
+    if (this->is_row_major) {
+        this->change_major();
     }
     imax_mv((unsigned char*)result.device_ptr, (unsigned char*)device_ptr, (unsigned char*)vector.device_ptr, imax_shape[1], imax_shape[0], 0);
     return result;
 }
 
-void IMAXArray::change_major() const {
+void IMAXArray::change_major() {
     if (imax_shape.size() == 1) {
         return;
     }
-    float *tmp = new float[imax_size];
+    std::cout << "imax_size=" << imax_size << ", imax_nbytes=" << imax_nbytes << std::endl;
+    float* tmp = new float[100000];
+    std::cout << "imax_size=" << imax_size << ", imax_nbytes=" << imax_nbytes << std::endl;
     std::memcpy(tmp, (void *)device_ptr, imax_nbytes);
-    for (size_t i = 0; i < imax_shape[0]; ++i) {
-        for (size_t j = 0; j < imax_shape[1]; ++j) {
-            float *p = (float *)device_ptr;
+    std::cout << "imax_size=" << imax_size << ", imax_nbytes=" << imax_nbytes << std::endl;
+    float *p = (float *)device_ptr;
+    for (ssize_t i = 0; i < imax_shape[0]; ++i) {
+        for (ssize_t j = 0; j < imax_shape[1]; ++j) {
             p[(i * imax_shape[1]) + j] = tmp[(j * imax_shape[0]) + i];
         }
     }
-    delete[] tmp;
+    delete tmp;
     is_row_major = !is_row_major;
 }
 

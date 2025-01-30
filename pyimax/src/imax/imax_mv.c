@@ -16,41 +16,39 @@ void imax_mv(unsigned char* values, unsigned char* keys, unsigned char* query, s
     // printf("imax_search_mv: imax_emb=%d, imax_size=%d\n", imax_emb, imax_size);
     // printf("imax_search_mv: imax_query_array=%p, imax_key_array=%p, imax_result_array=%p\n", imax_query_array, imax_key_array, imax_result_array);
     printf("imax_mv: qty=%d, size=%d, threadId=%d\n", qty, size, threadId);
-    int imax_kernel_row_size = (256*1024)/imax_emb;
-    if (imax_kernel_row_size < imax_size) {
-        imax_kernel_row_size -= imax_kernel_row_size % imax_size;
-    } else {
-        imax_kernel_row_size = imax_size;
+    int imax_unit_col_size = imax_emb / IMAX_KERNEL_COL_SIZE;
+    if (imax_unit_col_size == 0) {
+        imax_unit_col_size = 1;
     }
-    for (int row_blk_idx = 0; row_blk_idx*imax_kernel_row_size < imax_size; row_blk_idx++) {
-        // printf("row_blk_idx=%d\n", row_blk_idx);
+    for (int col_unit_blk_idx = 0; col_unit_blk_idx*imax_unit_col_size < imax_emb; col_unit_blk_idx++) {
+        // printf("col_unit_blk_idx=%d\n", col_unit_blk_idx);
         Ull qaddr[IMAX_KERNEL_COL_SIZE];
         Ull kaddr[IMAX_KERNEL_COL_SIZE*4];
         Ull raddr[4];
-        for (int k = 0; k < IMAX_KERNEL_COL_SIZE; k++) {
-            for (int j = 0; j < 4; j++) {
-                kaddr[j + k*4] = ((Ull)imax_key_array) + ((row_blk_idx*imax_kernel_row_size)+j)*imax_emb*4 + k*8;
+        for (int j = 0; j < IMAX_KERNEL_COL_SIZE; j++) {
+            for (int k = 0; k < 4; k++) {
+                kaddr[j + k*4] = ((Ull)imax_key_array) + ((col_unit_blk_idx*imax_size)+j)*4 + k*8;
             }
-            qaddr[k] = ((Ull)imax_query_array) + k*8;
+            qaddr[j] = ((Ull)imax_query_array) + j*4;
             // printf("kaddr[%d]: %p, %p, %p, %p\n", k, (void*)kaddr[k*4], (void*)kaddr[k*4+1], (void*)kaddr[k*4+2], (void*)kaddr[k*4+3]);
-            // printf("kaddr_value[%d]: %f, %f, %f, %f\n", k, imax_key_array[(row_blk_idx*imax_kernel_row_size)+0 + k*4], imax_key_array[(row_blk_idx*imax_kernel_row_size)+1 + k*4], imax_key_array[(row_blk_idx*imax_kernel_row_size)+2 + k*4], imax_key_array[(row_blk_idx*imax_kernel_row_size)+3 + k*4]);
+            // printf("kaddr_value[%d]: %f, %f, %f, %f\n", k, imax_key_array[(col_unit_blk_idx*imax_unit_col_size)+0 + k*4], imax_key_array[(col_unit_blk_idx*imax_unit_col_size)+1 + k*4], imax_key_array[(col_unit_blk_idx*imax_unit_col_size)+2 + k*4], imax_key_array[(col_unit_blk_idx*imax_unit_col_size)+3 + k*4]);
             // printf("qaddr[%d]: %p\n", k, (void*)qaddr[k]);
             // printf("qaddr_value[%d]: %f\n", k, imax_query_array[k]);
         }
         for (int j = 0; j < 4; j++) {
-            raddr[j] = ((Ull)imax_result_array) + (imax_kernel_row_size*row_blk_idx)*4 + j*4;
+            raddr[j] = ((Ull)imax_result_array) + j*4;
             // printf("raddr[%d]: %p\n", j, (void*)raddr[j]);
-            // printf("raddr_value[%d]: %f\n", j, imax_result_array[(imax_kernel_row_size*row_blk_idx)+j]);
+            // printf("raddr_value[%d]: %f\n", j, imax_result_array[(imax_unit_col_size*col_unit_blk_idx)+j]);
         }
 
         Ull CHIP, LOLP, INIT0, INIT1, LOOP0, LOOP1;
         Ull cofs, rofs, oofs, cofs1;
-        Ull fetch_size = imax_emb * imax_kernel_row_size * 4;
+        Ull fetch_size = imax_size * imax_unit_col_size * 4;
         Ull result_fetch_size = imax_size * 4;
-        Ull rofs_init = ((0-4*4LL)<<32)|((0-4*imax_emb*4LL)&0xFFFFFFFF);
-        Ull cofs_init = 0<<32|((0-IMAX_KERNEL_COL_SIZE*8LL)&0xFFFFFFFF);
-        Ull rofs_add = ((4*4LL)<<32)|((4*imax_emb*4LL)&0xFFFFFFFF);
-        Ull cofs_add = 0<<32|((IMAX_KERNEL_COL_SIZE*8LL)&0xffffffff);
+        Ull rofs_init = ((0-4*4LL)<<32)|((0-8*4LL)&0xFFFFFFFF);
+        Ull cofs_init = 0<<32|((0-imax_size*4LL)&0xFFFFFFFF);
+        Ull rofs_add = ((4*4LL)<<32)|((8*4LL)&0xFFFFFFFF);
+        Ull cofs_add = 0<<32|((imax_size*4LL)&0xffffffff);
         Ull BR[64][4][4], AR[64][4];
 
 #define mv1_core(r, rm1, k0, k1, k2, k3, q) \
@@ -58,7 +56,7 @@ void imax_mv(unsigned char* values, unsigned char* keys, unsigned char* query, s
                     mop(OP_LDR,  3, &BR[rm1][0][0], (Ull)kaddr[k1], (Ull)cofs1, MSK_W0, (Ull)kaddr[k0], fetch_size, 0, 0, (Ull)NULL, fetch_size); \
                     mop(OP_LDR,  3, &BR[rm1][1][1], (Ull)kaddr[k2], (Ull)cofs1, MSK_W0, (Ull)kaddr[k0], fetch_size, 0, 0, (Ull)NULL, fetch_size); \
                     mop(OP_LDR,  3, &BR[rm1][1][0], (Ull)kaddr[k3], (Ull)cofs1, MSK_W0, (Ull)kaddr[k0], fetch_size, 0, 0, (Ull)NULL, fetch_size); \
-                    mop(OP_LDR,  3, &BR[rm1][2][1], (Ull)qaddr[q],  (Ull)cofs, MSK_W0, (Ull)qaddr[0],  imax_emb,   0, 0, (Ull)NULL, imax_emb  ); \
+                    mop(OP_LDWR,  3, &BR[rm1][2][1], (Ull)qaddr[q],  (Ull)cofs, MSK_W0, (Ull)qaddr[0],  imax_emb,   0, 0, (Ull)NULL, imax_emb  ); \
                     exe(OP_FMA, &AR[r][3], AR[rm1][3], EXP_H3210, BR[rm1][0][1], EXP_H3210, BR[rm1][2][1], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL); \
                     exe(OP_FMA, &AR[r][2], AR[rm1][2], EXP_H3210, BR[rm1][0][0], EXP_H3210, BR[rm1][2][1], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL); \
                     exe(OP_FMA, &AR[r][1], AR[rm1][1], EXP_H3210, BR[rm1][1][1], EXP_H3210, BR[rm1][2][1], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL); \
@@ -78,13 +76,13 @@ void imax_mv(unsigned char* values, unsigned char* keys, unsigned char* query, s
                     mop(OP_STWR, 3, &AR[r][1], (Ull)oofs, (Ull)raddr[2], MSK_D0, (Ull)raddr[0], result_fetch_size, 0, 0, (Ull)NULL, result_fetch_size); \
                     mop(OP_STWR, 3, &AR[r][0], (Ull)oofs, (Ull)raddr[3], MSK_D0, (Ull)raddr[0], result_fetch_size, 0, 0, (Ull)NULL, result_fetch_size)
 
-        //printf("imax_kernel_row_size=%d\n", imax_kernel_row_size);
+        //printf("imax_unit_col_size=%d\n", imax_unit_col_size);
         //printf("imax_emb=%d\n", imax_emb);
         //printf("imax_emb/(IMAX_KERNEL_COL_SIZE*2)=%d\n", imax_emb/(IMAX_KERNEL_COL_SIZE*2));
 //EMAX5A begin mv1 mapdist=0
         for (CHIP=0;CHIP<NCHIP;CHIP++) {
-            for (INIT1=1,LOOP1=imax_kernel_row_size/4,rofs=rofs_init;LOOP1--;INIT1=0) {
-                for (INIT0=1,LOOP0=imax_emb/(IMAX_KERNEL_COL_SIZE*2),cofs=cofs_init;LOOP0--;INIT0=0) {
+            for (INIT1=1,LOOP1=imax_size/8,rofs=rofs_init;LOOP1--;INIT1=0) {
+                for (INIT0=1,LOOP0=imax_unit_col_size,cofs=cofs_init;LOOP0--;INIT0=0) {
                     exe(OP_ADD, &cofs, INIT0?cofs:cofs, EXP_H3210, cofs_add, EXP_H3210, 0LL, EXP_H3210, OP_AND, 0xffffffffffffffffLL, OP_NOP, 0LL);
                     exe(OP_ADD, &rofs, rofs, EXP_H3210, INIT0?rofs_add:0, EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
                     exe(OP_ADD, &oofs, rofs, EXP_H3232, 0LL, EXP_H3210, 0LL, EXP_H3210, OP_AND, 0xffffffffLL, OP_NOP, 0LL);
@@ -94,7 +92,7 @@ void imax_mv(unsigned char* values, unsigned char* keys, unsigned char* query, s
                     mop(OP_LDR,  3, &BR[2][0][0], (Ull)kaddr[1], (Ull)cofs1, MSK_W0, (Ull)kaddr[0], fetch_size, 0, 0, (Ull)NULL, fetch_size);
                     mop(OP_LDR,  3, &BR[2][1][1], (Ull)kaddr[2], (Ull)cofs1, MSK_W0, (Ull)kaddr[0], fetch_size, 0, 0, (Ull)NULL, fetch_size);
                     mop(OP_LDR,  3, &BR[2][1][0], (Ull)kaddr[3], (Ull)cofs1, MSK_W0, (Ull)kaddr[0], fetch_size, 0, 0, (Ull)NULL, fetch_size);
-                    mop(OP_LDR,  3, &BR[2][2][1], (Ull)qaddr[0], (Ull)cofs, MSK_W0, (Ull)qaddr[0], imax_emb  , 0, 0, (Ull)NULL, imax_emb  );
+                    mop(OP_LDWR,  3, &BR[2][2][1], (Ull)qaddr[0], (Ull)cofs, MSK_W0, (Ull)qaddr[0], imax_emb  , 0, 0, (Ull)NULL, imax_emb  );
 
                     exe(OP_FML, &AR[3][3], BR[2][0][1], EXP_H3210, BR[2][2][1], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
                     exe(OP_FML, &AR[3][2], BR[2][0][0], EXP_H3210, BR[2][2][1], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
@@ -143,7 +141,7 @@ void imax_mv(unsigned char* values, unsigned char* keys, unsigned char* query, s
 
                     mv1_store(62, 59);
                     // printf("mv1_store: raddr[0]=%p, raddr[1]=%p, raddr[2]=%p, raddr[3]=%p\n", raddr[0], raddr[1], raddr[2], raddr[3]);
-                    // printf("mv1 result: %f, %f, %f, %f\n", imax_result_array[(imax_kernel_row_size*row_blk_idx)+0], imax_result_array[(imax_kernel_row_size*row_blk_idx)+1], imax_result_array[(imax_kernel_row_size*row_blk_idx)+2], imax_result_array[(imax_kernel_row_size*row_blk_idx)+3]);
+                    // printf("mv1 result: %f, %f, %f, %f\n", imax_result_array[(imax_unit_col_size*col_unit_blk_idx)+0], imax_result_array[(imax_unit_col_size*col_unit_blk_idx)+1], imax_result_array[(imax_unit_col_size*col_unit_blk_idx)+2], imax_result_array[(imax_unit_col_size*col_unit_blk_idx)+3]);
                 }
             }
         }

@@ -118,7 +118,7 @@ public:
 
     IMAXArray mv(const IMAXArray &vector);
 
-    void change_major() const;
+    void change_major();
 private:
     std::vector<ssize_t> imax_shape;      // 配列の形状
     size_t imax_size;

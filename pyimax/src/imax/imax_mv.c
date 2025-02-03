@@ -20,7 +20,6 @@ void imax_mv(unsigned char* values, unsigned char* keys, unsigned char* query, s
     }
 
     reset_nanosec(0);
-    get_nanosec(0, 0);
     for (int col_unit_blk_idx = 0; col_unit_blk_idx*imax_unit_col_size*IMAX_KERNEL_COL_SIZE < imax_emb; col_unit_blk_idx++) {
         Ull qaddr[IMAX_KERNEL_COL_SIZE];
         Ull kaddr[IMAX_KERNEL_COL_SIZE*4];
@@ -162,6 +161,7 @@ void imax_mv(unsigned char* values, unsigned char* keys, unsigned char* query, s
 //EMAX5A end
     }
 //EMAX5A drain_dirty_lmm
+    get_nanosec(0, 0);
     show_nanosec(0);
 
     // printf("IMAX Result: [");

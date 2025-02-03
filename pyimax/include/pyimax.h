@@ -45,7 +45,11 @@ public:
         }
 
         // グローバルアドレスから割り当て (シミュレーション)
-        memory_align(56*2);
+        if (shape.size() == 1) {
+            memory_align({56});
+        } else {
+            memory_align({8, 56});
+        }
         device_ptr = global_memory_addr;
         xmax_bzero((Uint *)device_ptr, imax_nbytes);
         global_memory_addr += imax_nbytes;
@@ -124,15 +128,18 @@ private:
     size_t imax_size;
     size_t imax_nbytes;
 
-    void memory_align(int alignment) {
+    void memory_align(std::vector<ssize_t> alignments) {
         imax_shape = shape;
 
+        int i = 0;
         for (auto &s: imax_shape) {
+            ssize_t alignment = alignments[i];
             ssize_t remainder = s % alignment;
             if (remainder != 0) {
                 ssize_t padding = alignment - remainder;
                 s += padding;
             }
+            i++;
         }
 
         imax_size = 1;

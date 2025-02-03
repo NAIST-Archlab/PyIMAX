@@ -33,8 +33,9 @@ void IMAXArray::numpy_to_imax(py::array array) {
 }
 
 std::string IMAXArray::repr() const {
-    std::string repr_str = "<IMAXArray device_ptr=0x" + 
-                            std::to_string(device_ptr) + ", shape=[";
+    std::stringstream ss;
+    ss << "<IMAXArray device_ptr=0x" << std::hex << device_ptr << ", shape=[";
+    std::string repr_str = ss.str();
     for (size_t i = 0; i < shape.size(); ++i) {
         repr_str += std::to_string(shape[i]);
         if (i < shape.size()-1)
@@ -60,14 +61,14 @@ void IMAXArray::change_major() {
         return;
     }
     std::cout << "imax_size=" << imax_size << ", imax_nbytes=" << imax_nbytes << std::endl;
-    float* tmp = new float[100000];
+    float* tmp = new float[200000];
     std::cout << "imax_size=" << imax_size << ", imax_nbytes=" << imax_nbytes << std::endl;
     std::memcpy(tmp, (void *)device_ptr, imax_nbytes);
     std::cout << "imax_size=" << imax_size << ", imax_nbytes=" << imax_nbytes << std::endl;
     float *p = (float *)device_ptr;
     for (ssize_t i = 0; i < imax_shape[0]; ++i) {
         for (ssize_t j = 0; j < imax_shape[1]; ++j) {
-            p[(i * imax_shape[1]) + j] = tmp[(j * imax_shape[0]) + i];
+            p[(j * imax_shape[0]) + i] = tmp[(i * imax_shape[1]) + j];
         }
     }
     delete tmp;
@@ -78,7 +79,7 @@ void IMAXArray::change_major() {
 #ifdef ARMZYNQ
 std::uintptr_t IMAXArray::global_memory_addr = (std::uintptr_t) 0x0000050000000000LL;
 #else
-std::uintptr_t IMAXArray::global_memory_addr = (std::uintptr_t)(new char[100000]);
+std::uintptr_t IMAXArray::global_memory_addr = (std::uintptr_t)(new char[200000]);
 #endif
 
 void init_imax_array(pybind11::module &m) {

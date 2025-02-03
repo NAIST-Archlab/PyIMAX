@@ -13,32 +13,26 @@ void imax_mv(unsigned char* values, unsigned char* keys, unsigned char* query, s
     float *imax_query_array = (float*) query;
     float *imax_result_array = (float*) values;
 
-    // printf("imax_search_mv: imax_emb=%d, imax_size=%d\n", imax_emb, imax_size);
-    // printf("imax_search_mv: imax_query_array=%p, imax_key_array=%p, imax_result_array=%p\n", imax_query_array, imax_key_array, imax_result_array);
     printf("imax_mv: qty=%d, size=%d, threadId=%d\n", qty, size, threadId);
     int imax_unit_col_size = imax_emb / IMAX_KERNEL_COL_SIZE;
-    if (imax_unit_col_size == 0) {
-        imax_unit_col_size = 1;
+    if ((imax_emb % IMAX_KERNEL_COL_SIZE) != 0) {
+        imax_unit_col_size += 1;
     }
-    for (int col_unit_blk_idx = 0; col_unit_blk_idx*imax_unit_col_size < imax_emb; col_unit_blk_idx++) {
-        // printf("col_unit_blk_idx=%d\n", col_unit_blk_idx);
+    for (int col_unit_blk_idx = 0; col_unit_blk_idx*imax_unit_col_size*IMAX_KERNEL_COL_SIZE < imax_emb; col_unit_blk_idx++) {
         Ull qaddr[IMAX_KERNEL_COL_SIZE];
         Ull kaddr[IMAX_KERNEL_COL_SIZE*4];
         Ull raddr[4];
         for (int j = 0; j < IMAX_KERNEL_COL_SIZE; j++) {
             for (int k = 0; k < 4; k++) {
-                kaddr[j + k*4] = ((Ull)imax_key_array) + ((col_unit_blk_idx*imax_size)+j)*4 + k*8;
+                kaddr[(j*4) + k] = ((Ull)imax_key_array) + (((j*imax_unit_col_size)+col_unit_blk_idx)*imax_size)*4 + k*8;
             }
-            qaddr[j] = ((Ull)imax_query_array) + j*4;
-            // printf("kaddr[%d]: %p, %p, %p, %p\n", k, (void*)kaddr[k*4], (void*)kaddr[k*4+1], (void*)kaddr[k*4+2], (void*)kaddr[k*4+3]);
-            // printf("kaddr_value[%d]: %f, %f, %f, %f\n", k, imax_key_array[(col_unit_blk_idx*imax_unit_col_size)+0 + k*4], imax_key_array[(col_unit_blk_idx*imax_unit_col_size)+1 + k*4], imax_key_array[(col_unit_blk_idx*imax_unit_col_size)+2 + k*4], imax_key_array[(col_unit_blk_idx*imax_unit_col_size)+3 + k*4]);
-            // printf("qaddr[%d]: %p\n", k, (void*)qaddr[k]);
-            // printf("qaddr_value[%d]: %f\n", k, imax_query_array[k]);
+            qaddr[j] = ((Ull)imax_query_array) + ((j*imax_unit_col_size)+col_unit_blk_idx)*4;
+            // printf("kaddr[%d]: %p, %p, %p, %p\n", j, kaddr[(j*4)+0], kaddr[(j*4)+1], kaddr[(j*4)+2], kaddr[(j*4)+3]);
+            // printf("kaddr_val[%d]: %f, %f, %f, %f\n", j, *((float*)kaddr[(j*4)+0]), *((float*)kaddr[(j*4)+1]), *(((float*)kaddr[(j*4)+2])), *(((float*)kaddr[(j*4)+3])));
+            // printf("qaddr[%d]: %p\n", j, qaddr[j]);
         }
         for (int j = 0; j < 4; j++) {
-            raddr[j] = ((Ull)imax_result_array) + j*4;
-            // printf("raddr[%d]: %p\n", j, (void*)raddr[j]);
-            // printf("raddr_value[%d]: %f\n", j, imax_result_array[(imax_unit_col_size*col_unit_blk_idx)+j]);
+            raddr[j] = ((Ull)imax_result_array) + j*8;
         }
 
         Ull CHIP, LOLP, INIT0, INIT1, LOOP0, LOOP1;
@@ -46,9 +40,9 @@ void imax_mv(unsigned char* values, unsigned char* keys, unsigned char* query, s
         Ull fetch_size = imax_size * imax_unit_col_size * 4;
         Ull result_fetch_size = imax_size * 4;
         Ull rofs_init = ((0-4*4LL)<<32)|((0-8*4LL)&0xFFFFFFFF);
-        Ull cofs_init = 0<<32|((0-imax_size*4LL)&0xFFFFFFFF);
+        Ull cofs_init = (0-4LL)<<32|((0-imax_size*4LL)&0xFFFFFFFF);
         Ull rofs_add = ((4*4LL)<<32)|((8*4LL)&0xFFFFFFFF);
-        Ull cofs_add = 0<<32|((imax_size*4LL)&0xffffffff);
+        Ull cofs_add = 4LL<<32|((imax_size*4LL)&0xffffffff);
         Ull BR[64][4][4], AR[64][4];
 
 #define mv1_core(r, rm1, k0, k1, k2, k3, q) \
@@ -56,48 +50,65 @@ void imax_mv(unsigned char* values, unsigned char* keys, unsigned char* query, s
                     mop(OP_LDR,  3, &BR[rm1][0][0], (Ull)kaddr[k1], (Ull)cofs1, MSK_W0, (Ull)kaddr[k0], fetch_size, 0, 0, (Ull)NULL, fetch_size); \
                     mop(OP_LDR,  3, &BR[rm1][1][1], (Ull)kaddr[k2], (Ull)cofs1, MSK_W0, (Ull)kaddr[k0], fetch_size, 0, 0, (Ull)NULL, fetch_size); \
                     mop(OP_LDR,  3, &BR[rm1][1][0], (Ull)kaddr[k3], (Ull)cofs1, MSK_W0, (Ull)kaddr[k0], fetch_size, 0, 0, (Ull)NULL, fetch_size); \
-                    mop(OP_LDWR,  3, &BR[rm1][2][1], (Ull)qaddr[q],  (Ull)cofs, MSK_W0, (Ull)qaddr[0],  imax_emb,   0, 0, (Ull)NULL, imax_emb  ); \
-                    exe(OP_FMA, &AR[r][3], AR[rm1][3], EXP_H3210, BR[rm1][0][1], EXP_H3210, BR[rm1][2][1], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL); \
-                    exe(OP_FMA, &AR[r][2], AR[rm1][2], EXP_H3210, BR[rm1][0][0], EXP_H3210, BR[rm1][2][1], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL); \
-                    exe(OP_FMA, &AR[r][1], AR[rm1][1], EXP_H3210, BR[rm1][1][1], EXP_H3210, BR[rm1][2][1], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL); \
-                    exe(OP_FMA, &AR[r][0], AR[rm1][0], EXP_H3210, BR[rm1][1][0], EXP_H3210, BR[rm1][2][1], EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL)
+                    mop(OP_LDWR,  3, &BR[rm1][2][1], (Ull)qaddr[q],  (Ull)cofs, MSK_W1, (Ull)qaddr[0],  imax_emb,   0, 0, (Ull)NULL, imax_emb  ); \
+                    exe(OP_FMA, &AR[r][3], AR[rm1][3], EXP_H3210, BR[rm1][0][1], EXP_H3210, BR[rm1][2][1], EXP_H1010, OP_NOP, 0LL, OP_NOP, 0LL); \
+                    exe(OP_FMA, &AR[r][2], AR[rm1][2], EXP_H3210, BR[rm1][0][0], EXP_H3210, BR[rm1][2][1], EXP_H1010, OP_NOP, 0LL, OP_NOP, 0LL); \
+                    exe(OP_FMA, &AR[r][1], AR[rm1][1], EXP_H3210, BR[rm1][1][1], EXP_H3210, BR[rm1][2][1], EXP_H1010, OP_NOP, 0LL, OP_NOP, 0LL); \
+                    exe(OP_FMA, &AR[r][0], AR[rm1][0], EXP_H3210, BR[rm1][1][0], EXP_H3210, BR[rm1][2][1], EXP_H1010, OP_NOP, 0LL, OP_NOP, 0LL);
+                    // printf("%d K: [%f, ", rm1, *(((float*)(&BR[rm1][0][1])))); \
+                    // printf("%f, ", *(((float*)(&BR[rm1][0][1])+1))); \
+                    // printf("%f, ", *(((float*)(&BR[rm1][0][0])))); \
+                    // printf("%f, ", *(((float*)(&BR[rm1][0][0])+1))); \
+                    // printf("%f, ", *(((float*)(&BR[rm1][1][1])))); \
+                    // printf("%f, ", *(((float*)(&BR[rm1][1][1])+1))); \
+                    // printf("%f, ", *(((float*)(&BR[rm1][1][0])))); \
+                    // printf("%f] ", *(((float*)(&BR[rm1][1][0])+1))); \
+                    // printf("Q: %f\n ", *(((float*)(&BR[rm1][2][1]))));
 
 #define mv1_store(r, rm1) \
-                    mop(OP_LDWR, 3, &BR[rm1][0][1], (Ull)raddr[0], (Ull)oofs, MSK_W0, (Ull)raddr[0], result_fetch_size, 0, 0, (Ull)NULL, result_fetch_size); \
-                    mop(OP_LDWR, 3, &BR[rm1][0][0], (Ull)raddr[1], (Ull)oofs, MSK_W0, (Ull)raddr[0], result_fetch_size, 0, 0, (Ull)NULL, result_fetch_size); \
-                    mop(OP_LDWR, 3, &BR[rm1][1][1], (Ull)raddr[2], (Ull)oofs, MSK_W0, (Ull)raddr[0], result_fetch_size, 0, 0, (Ull)NULL, result_fetch_size); \
-                    mop(OP_LDWR, 3, &BR[rm1][1][0], (Ull)raddr[3], (Ull)oofs, MSK_W0, (Ull)raddr[0], result_fetch_size, 0, 0, (Ull)NULL, result_fetch_size); \
-                    exe(OP_FAD, &AR[r][3], BR[rm1][0][1], EXP_H1010, AR[rm1][3], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL); \
-                    exe(OP_FAD, &AR[r][2], BR[rm1][0][0], EXP_H1010, AR[rm1][2], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL); \
-                    exe(OP_FAD, &AR[r][1], BR[rm1][1][1], EXP_H1010, AR[rm1][1], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL); \
-                    exe(OP_FAD, &AR[r][0], BR[rm1][1][0], EXP_H1010, AR[rm1][0], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL); \
-                    mop(OP_STWR, 3, &AR[r][3], (Ull)oofs, (Ull)raddr[0], MSK_D0, (Ull)raddr[0], result_fetch_size, 0, 0, (Ull)NULL, result_fetch_size); \
-                    mop(OP_STWR, 3, &AR[r][2], (Ull)oofs, (Ull)raddr[1], MSK_D0, (Ull)raddr[0], result_fetch_size, 0, 0, (Ull)NULL, result_fetch_size); \
-                    mop(OP_STWR, 3, &AR[r][1], (Ull)oofs, (Ull)raddr[2], MSK_D0, (Ull)raddr[0], result_fetch_size, 0, 0, (Ull)NULL, result_fetch_size); \
-                    mop(OP_STWR, 3, &AR[r][0], (Ull)oofs, (Ull)raddr[3], MSK_D0, (Ull)raddr[0], result_fetch_size, 0, 0, (Ull)NULL, result_fetch_size)
+                    mop(OP_LDR, 3, &BR[rm1][0][1], (Ull)raddr[0], (Ull)oofs, MSK_W0, (Ull)raddr[0], result_fetch_size, 0, 0, (Ull)NULL, result_fetch_size); \
+                    mop(OP_LDR, 3, &BR[rm1][0][0], (Ull)raddr[1], (Ull)oofs, MSK_W0, (Ull)raddr[0], result_fetch_size, 0, 0, (Ull)NULL, result_fetch_size); \
+                    mop(OP_LDR, 3, &BR[rm1][1][1], (Ull)raddr[2], (Ull)oofs, MSK_W0, (Ull)raddr[0], result_fetch_size, 0, 0, (Ull)NULL, result_fetch_size); \
+                    mop(OP_LDR, 3, &BR[rm1][1][0], (Ull)raddr[3], (Ull)oofs, MSK_W0, (Ull)raddr[0], result_fetch_size, 0, 0, (Ull)NULL, result_fetch_size); \
+                    exe(OP_FAD, &AR[r][3], BR[rm1][0][1], EXP_H3210, AR[rm1][3], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL); \
+                    exe(OP_FAD, &AR[r][2], BR[rm1][0][0], EXP_H3210, AR[rm1][2], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL); \
+                    exe(OP_FAD, &AR[r][1], BR[rm1][1][1], EXP_H3210, AR[rm1][1], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL); \
+                    exe(OP_FAD, &AR[r][0], BR[rm1][1][0], EXP_H3210, AR[rm1][0], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL); \
+                    mop(OP_STR, 3, &AR[r][3], (Ull)oofs, (Ull)raddr[0], MSK_D0, (Ull)raddr[0], result_fetch_size, 0, 0, (Ull)NULL, result_fetch_size); \
+                    mop(OP_STR, 3, &AR[r][2], (Ull)oofs, (Ull)raddr[1], MSK_D0, (Ull)raddr[0], result_fetch_size, 0, 0, (Ull)NULL, result_fetch_size); \
+                    mop(OP_STR, 3, &AR[r][1], (Ull)oofs, (Ull)raddr[2], MSK_D0, (Ull)raddr[0], result_fetch_size, 0, 0, (Ull)NULL, result_fetch_size); \
+                    mop(OP_STR, 3, &AR[r][0], (Ull)oofs, (Ull)raddr[3], MSK_D0, (Ull)raddr[0], result_fetch_size, 0, 0, (Ull)NULL, result_fetch_size)
 
-        //printf("imax_unit_col_size=%d\n", imax_unit_col_size);
-        //printf("imax_emb=%d\n", imax_emb);
-        //printf("imax_emb/(IMAX_KERNEL_COL_SIZE*2)=%d\n", imax_emb/(IMAX_KERNEL_COL_SIZE*2));
+        // printf("imax_unit_col_size=%d\n", imax_unit_col_size);
+        // printf("imax_emb=%d\n", imax_emb);
 //EMAX5A begin mv1 mapdist=0
         for (CHIP=0;CHIP<NCHIP;CHIP++) {
             for (INIT1=1,LOOP1=imax_size/8,rofs=rofs_init;LOOP1--;INIT1=0) {
                 for (INIT0=1,LOOP0=imax_unit_col_size,cofs=cofs_init;LOOP0--;INIT0=0) {
                     exe(OP_ADD, &cofs, INIT0?cofs:cofs, EXP_H3210, cofs_add, EXP_H3210, 0LL, EXP_H3210, OP_AND, 0xffffffffffffffffLL, OP_NOP, 0LL);
                     exe(OP_ADD, &rofs, rofs, EXP_H3210, INIT0?rofs_add:0, EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
-                    exe(OP_ADD, &oofs, rofs, EXP_H3232, 0LL, EXP_H3210, 0LL, EXP_H3210, OP_AND, 0xffffffffLL, OP_NOP, 0LL);
+                    exe(OP_ADD, &oofs, rofs, EXP_H1010, 0LL, EXP_H3210, 0LL, EXP_H3210, OP_AND, 0xffffffffLL, OP_NOP, 0LL);
                     exe(OP_ADD, &cofs1, cofs, EXP_H3210, rofs, EXP_H1010, 0LL, EXP_H3210, OP_AND, 0xffffffffLL, OP_NOP, 0LL);
 
                     mop(OP_LDR,  3, &BR[2][0][1], (Ull)kaddr[0], (Ull)cofs1, MSK_W0, (Ull)kaddr[0], fetch_size, 0, 0, (Ull)NULL, fetch_size);
                     mop(OP_LDR,  3, &BR[2][0][0], (Ull)kaddr[1], (Ull)cofs1, MSK_W0, (Ull)kaddr[0], fetch_size, 0, 0, (Ull)NULL, fetch_size);
                     mop(OP_LDR,  3, &BR[2][1][1], (Ull)kaddr[2], (Ull)cofs1, MSK_W0, (Ull)kaddr[0], fetch_size, 0, 0, (Ull)NULL, fetch_size);
                     mop(OP_LDR,  3, &BR[2][1][0], (Ull)kaddr[3], (Ull)cofs1, MSK_W0, (Ull)kaddr[0], fetch_size, 0, 0, (Ull)NULL, fetch_size);
-                    mop(OP_LDWR,  3, &BR[2][2][1], (Ull)qaddr[0], (Ull)cofs, MSK_W0, (Ull)qaddr[0], imax_emb  , 0, 0, (Ull)NULL, imax_emb  );
+                    mop(OP_LDWR,  3, &BR[2][2][1], (Ull)qaddr[0], (Ull)cofs, MSK_W1, (Ull)qaddr[0], imax_emb  , 0, 0, (Ull)NULL, imax_emb  );
+                    // printf("2 K: [%f, ",    *(((float*)(&BR[2][0][1]))));
+                    // printf("%f, ",   *(((float*)(&BR[2][0][1])+1)));
+                    // printf("%f, ",    *(((float*)(&BR[2][0][0]))));
+                    // printf("%f, ",   *(((float*)(&BR[2][0][0])+1)));
+                    // printf("%f, ",    *(((float*)(&BR[2][1][1]))));
+                    // printf("%f, ",   *(((float*)(&BR[2][1][1])+1)));
+                    // printf("%f, ",    *(((float*)(&BR[2][1][0]))));
+                    // printf("%f] ",   *(((float*)(&BR[2][1][0])+1)));
+                    // printf("Q: %f\n",    *(((float*)(&BR[2][1][0]))));
 
-                    exe(OP_FML, &AR[3][3], BR[2][0][1], EXP_H3210, BR[2][2][1], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
-                    exe(OP_FML, &AR[3][2], BR[2][0][0], EXP_H3210, BR[2][2][1], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
-                    exe(OP_FML, &AR[3][1], BR[2][0][1], EXP_H3210, BR[2][2][1], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
-                    exe(OP_FML, &AR[3][0], BR[2][0][0], EXP_H3210, BR[2][2][1], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
+                    exe(OP_FML, &AR[3][3], BR[2][0][1], EXP_H3210, BR[2][2][1], EXP_H1010, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
+                    exe(OP_FML, &AR[3][2], BR[2][0][0], EXP_H3210, BR[2][2][1], EXP_H1010, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
+                    exe(OP_FML, &AR[3][1], BR[2][0][1], EXP_H3210, BR[2][2][1], EXP_H1010, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
+                    exe(OP_FML, &AR[3][0], BR[2][0][0], EXP_H3210, BR[2][2][1], EXP_H1010, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
 
                     mv1_core( 4,  3,  4,  5,  6,  7,  1);mv1_core( 5,  4,  8,  9, 10, 11,  2);
                     mv1_core( 6,  5, 12, 13, 14, 15,  3);mv1_core( 7,  6, 16, 17, 18, 19,  4);
@@ -134,12 +145,12 @@ void imax_mv(unsigned char* values, unsigned char* keys, unsigned char* query, s
                     // mv1_core(60, 59,232,233,234,235, 58);
                     // mv1_core(61, 60,236,237,238,239, 59);
 
-                    exe(OP_FAD, &AR[59][3], AR[58][3], EXP_H3232, AR[58][3], EXP_H1010, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
-                    exe(OP_FAD, &AR[59][2], AR[58][2], EXP_H3232, AR[58][2], EXP_H1010, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
-                    exe(OP_FAD, &AR[59][1], AR[58][1], EXP_H3232, AR[58][1], EXP_H1010, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
-                    exe(OP_FAD, &AR[59][0], AR[58][0], EXP_H3232, AR[58][0], EXP_H1010, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
+                    // exe(OP_FAD, &AR[59][3], AR[58][3], EXP_H3232, AR[58][3], EXP_H1010, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
+                    // exe(OP_FAD, &AR[59][2], AR[58][2], EXP_H3232, AR[58][2], EXP_H1010, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
+                    // exe(OP_FAD, &AR[59][1], AR[58][1], EXP_H3232, AR[58][1], EXP_H1010, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
+                    // exe(OP_FAD, &AR[59][0], AR[58][0], EXP_H3232, AR[58][0], EXP_H1010, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
 
-                    mv1_store(62, 59);
+                    mv1_store(62, 58);
                     // printf("mv1_store: raddr[0]=%p, raddr[1]=%p, raddr[2]=%p, raddr[3]=%p\n", raddr[0], raddr[1], raddr[2], raddr[3]);
                     // printf("mv1 result: %f, %f, %f, %f\n", imax_result_array[(imax_unit_col_size*col_unit_blk_idx)+0], imax_result_array[(imax_unit_col_size*col_unit_blk_idx)+1], imax_result_array[(imax_unit_col_size*col_unit_blk_idx)+2], imax_result_array[(imax_unit_col_size*col_unit_blk_idx)+3]);
                 }
@@ -149,12 +160,10 @@ void imax_mv(unsigned char* values, unsigned char* keys, unsigned char* query, s
     }
 //EMAX5A drain_dirty_lmm
 
-    float minDist = INFINITY;
     // printf("IMAX Result: [");
-    // for (int j = 1; j <= size; j++) {
-        // float result = -imax_result_array[j-1];
-        // printf("%f", result);
-        // if (j < size) {
+    // for (int j = 0; j < size; j++) {
+        // printf("%f", imax_result_array[j]);
+        // if (j < size - 1) {
             // printf(", ");
         // }
     // }

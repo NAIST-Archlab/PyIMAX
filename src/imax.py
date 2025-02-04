@@ -2,13 +2,17 @@ from pyimax import IMAXArray, sysinit
 import numpy as np
 
 def main() -> None:
-    size = 512
+    size = 100
     a = np.array([range(size), range(size), range(size), range(size), range(size), range(size), range(size), range(size), range(size), range(size)], dtype=np.float32)
     b = np.array(range(size), dtype=np.float32)
     sysinit(8)
     a_i = IMAXArray.from_numpy(a)
     b_i = IMAXArray.from_numpy(b)
+    c_i = a_i.mv(b_i)
     print(a_i)
+    print(b_i)
+    print(c_i)
+    b_i = IMAXArray.from_numpy(b)
     c_i = a_i.mv(b_i)
     print(a_i)
     print(b_i)

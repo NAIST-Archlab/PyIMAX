@@ -3,12 +3,14 @@ import numpy as np
 
 
 def generate_2d_array(rows, cols):
-    array_1d = np.arange(200, dtype=np.float32)  # 0から199までの配列を作成
-    array_2d = np.random.choice(array_1d, (rows, cols), replace=True)  # ランダムに選択
+    # array_1d = np.arange(200, dtype=np.float32)  # 0から199までの配列を作成
+    # array_2d = np.random.choice(array_1d, (rows, cols), replace=True)  # ランダムに選択
+    array_2d = np.zeros((rows, cols), dtype=np.float32)
+    array_2d[:, ::5] = 1
     return array_2d
 
 def main() -> None:
-    size = 100
+    size = 56*5
     a = generate_2d_array(8, size)
     b = np.array(range(size), dtype=np.float32)
     sysinit(4)

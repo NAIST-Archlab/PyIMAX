@@ -54,24 +54,24 @@ void imax_mv(unsigned char* values, unsigned char* keys, unsigned char* query, s
                     mop(OP_LDR,  3, &BR[rm1][1][1], (Ull)kaddr[k2], (Ull)cofs1, MSK_W0, (Ull)kaddr[k0], fetch_size, 0, 0, (Ull)NULL, fetch_size); \
                     mop(OP_LDR,  3, &BR[rm1][1][0], (Ull)kaddr[k3], (Ull)cofs1, MSK_W0, (Ull)kaddr[k0], fetch_size, 0, 0, (Ull)NULL, fetch_size); \
                     mop(OP_LDWR, 3, &BR[rm1][2][1], (Ull)qaddr[q],  (Ull)cofs,  MSK_W1, (Ull)qaddr[0],  imax_emb,   0, 0, (Ull)NULL, imax_emb  ); \
-                    exe(OP_FMA, &AR[r][3], AR[rm1][3], EXP_H3210, BR[rm1][0][1], EXP_H3210, BR[rm1][2][1], EXP_H1010, OP_NOP, 0LL, OP_NOP, 0LL); \
-                    exe(OP_FMA, &AR[r][2], AR[rm1][2], EXP_H3210, BR[rm1][0][0], EXP_H3210, BR[rm1][2][1], EXP_H1010, OP_NOP, 0LL, OP_NOP, 0LL); \
-                    exe(OP_FMA, &AR[r][1], AR[rm1][1], EXP_H3210, BR[rm1][1][1], EXP_H3210, BR[rm1][2][1], EXP_H1010, OP_NOP, 0LL, OP_NOP, 0LL); \
-                    exe(OP_FMA, &AR[r][0], AR[rm1][0], EXP_H3210, BR[rm1][1][0], EXP_H3210, BR[rm1][2][1], EXP_H1010, OP_NOP, 0LL, OP_NOP, 0LL)
+                    exe(OP_FMA, &AR[r][0], AR[rm1][0], EXP_H3210, BR[rm1][0][1], EXP_H3210, BR[rm1][2][1], EXP_H1010, OP_NOP, 0LL, OP_NOP, 0LL); \
+                    exe(OP_FMA, &AR[r][1], AR[rm1][1], EXP_H3210, BR[rm1][0][0], EXP_H3210, BR[rm1][2][1], EXP_H1010, OP_NOP, 0LL, OP_NOP, 0LL); \
+                    exe(OP_FMA, &AR[r][2], AR[rm1][2], EXP_H3210, BR[rm1][1][1], EXP_H3210, BR[rm1][2][1], EXP_H1010, OP_NOP, 0LL, OP_NOP, 0LL); \
+                    exe(OP_FMA, &AR[r][3], AR[rm1][3], EXP_H3210, BR[rm1][1][0], EXP_H3210, BR[rm1][2][1], EXP_H1010, OP_NOP, 0LL, OP_NOP, 0LL)
 
 #define mv1_store(r, rm1) \
-                    mop(OP_LDR, 3, &BR[rm1][0][1], (Ull)raddr[0], (Ull)oofs, MSK_W0, (Ull)raddr[0], result_fetch_size, 0, 1, (Ull)NULL, result_fetch_size); \
-                    mop(OP_LDR, 3, &BR[rm1][0][0], (Ull)raddr[1], (Ull)oofs, MSK_W0, (Ull)raddr[0], result_fetch_size, 0, 1, (Ull)NULL, result_fetch_size); \
-                    mop(OP_LDR, 3, &BR[rm1][1][1], (Ull)raddr[2], (Ull)oofs, MSK_W0, (Ull)raddr[0], result_fetch_size, 0, 1, (Ull)NULL, result_fetch_size); \
-                    mop(OP_LDR, 3, &BR[rm1][1][0], (Ull)raddr[3], (Ull)oofs, MSK_W0, (Ull)raddr[0], result_fetch_size, 0, 1, (Ull)NULL, result_fetch_size); \
-                    exe(OP_FAD, &AR[r][3], BR[rm1][0][1], EXP_H3210, AR[rm1][3], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL); \
-                    exe(OP_FAD, &AR[r][2], BR[rm1][0][0], EXP_H3210, AR[rm1][2], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL); \
-                    exe(OP_FAD, &AR[r][1], BR[rm1][1][1], EXP_H3210, AR[rm1][1], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL); \
-                    exe(OP_FAD, &AR[r][0], BR[rm1][1][0], EXP_H3210, AR[rm1][0], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL); \
-                    mop(OP_STR, 3, &AR[r][3], (Ull)oofs, (Ull)raddr[0], MSK_D0, (Ull)raddr[0], result_fetch_size, 0, 1, (Ull)NULL, result_fetch_size); \
-                    mop(OP_STR, 3, &AR[r][2], (Ull)oofs, (Ull)raddr[1], MSK_D0, (Ull)raddr[0], result_fetch_size, 0, 1, (Ull)NULL, result_fetch_size); \
-                    mop(OP_STR, 3, &AR[r][1], (Ull)oofs, (Ull)raddr[2], MSK_D0, (Ull)raddr[0], result_fetch_size, 0, 1, (Ull)NULL, result_fetch_size); \
-                    mop(OP_STR, 3, &AR[r][0], (Ull)oofs, (Ull)raddr[3], MSK_D0, (Ull)raddr[0], result_fetch_size, 0, 1, (Ull)NULL, result_fetch_size)
+                    mop(OP_LDR, 3, &BR[r][0][1], (Ull)raddr[0], (Ull)oofs, MSK_W0, (Ull)raddr[0], result_fetch_size, 0, 1, (Ull)NULL, result_fetch_size); \
+                    mop(OP_LDR, 3, &BR[r][1][1], (Ull)raddr[1], (Ull)oofs, MSK_W0, (Ull)raddr[0], result_fetch_size, 0, 1, (Ull)NULL, result_fetch_size); \
+                    mop(OP_LDR, 3, &BR[r][2][1], (Ull)raddr[2], (Ull)oofs, MSK_W0, (Ull)raddr[0], result_fetch_size, 0, 1, (Ull)NULL, result_fetch_size); \
+                    mop(OP_LDR, 3, &BR[r][3][1], (Ull)raddr[3], (Ull)oofs, MSK_W0, (Ull)raddr[0], result_fetch_size, 0, 1, (Ull)NULL, result_fetch_size); \
+                    exe(OP_FAD, &AR[r][0], AR[rm1][0], EXP_H3210, BR[r][0][1], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL); \
+                    exe(OP_FAD, &AR[r][1], AR[rm1][1], EXP_H3210, BR[r][1][1], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL); \
+                    exe(OP_FAD, &AR[r][2], AR[rm1][2], EXP_H3210, BR[r][2][1], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL); \
+                    exe(OP_FAD, &AR[r][3], AR[rm1][3], EXP_H3210, BR[r][3][1], EXP_H3210, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL); \
+                    mop(OP_STR, 3, &AR[r][0], (Ull)oofs, (Ull)raddr[0], MSK_D0, (Ull)raddr[0], result_fetch_size, 0, 1, (Ull)NULL, result_fetch_size); \
+                    mop(OP_STR, 3, &AR[r][1], (Ull)oofs, (Ull)raddr[1], MSK_D0, (Ull)raddr[0], result_fetch_size, 0, 1, (Ull)NULL, result_fetch_size); \
+                    mop(OP_STR, 3, &AR[r][2], (Ull)oofs, (Ull)raddr[2], MSK_D0, (Ull)raddr[0], result_fetch_size, 0, 1, (Ull)NULL, result_fetch_size); \
+                    mop(OP_STR, 3, &AR[r][3], (Ull)oofs, (Ull)raddr[3], MSK_D0, (Ull)raddr[0], result_fetch_size, 0, 1, (Ull)NULL, result_fetch_size)
 
 //EMAX5A begin mv1 mapdist=0
         for (CHIP=0;CHIP<NCHIP;CHIP++) {
@@ -88,10 +88,10 @@ void imax_mv(unsigned char* values, unsigned char* keys, unsigned char* query, s
                     mop(OP_LDR,  3, &BR[2][1][0], (Ull)kaddr[3], (Ull)cofs1, MSK_W0, (Ull)kaddr[0], fetch_size, 0, 0, (Ull)NULL, fetch_size);
                     mop(OP_LDWR, 3, &BR[2][2][1], (Ull)qaddr[0], (Ull)cofs,  MSK_W1, (Ull)qaddr[0], imax_emb  , 0, 0, (Ull)NULL, imax_emb  );
 
-                    exe(OP_FML, &AR[3][3], BR[2][0][1], EXP_H3210, BR[2][2][1], EXP_H1010, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
-                    exe(OP_FML, &AR[3][2], BR[2][0][0], EXP_H3210, BR[2][2][1], EXP_H1010, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
-                    exe(OP_FML, &AR[3][1], BR[2][0][1], EXP_H3210, BR[2][2][1], EXP_H1010, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
-                    exe(OP_FML, &AR[3][0], BR[2][0][0], EXP_H3210, BR[2][2][1], EXP_H1010, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
+                    exe(OP_FML, &AR[3][0], BR[2][0][1], EXP_H3210, BR[2][2][1], EXP_H1010, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
+                    exe(OP_FML, &AR[3][1], BR[2][0][0], EXP_H3210, BR[2][2][1], EXP_H1010, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
+                    exe(OP_FML, &AR[3][2], BR[2][0][1], EXP_H3210, BR[2][2][1], EXP_H1010, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
+                    exe(OP_FML, &AR[3][3], BR[2][0][0], EXP_H3210, BR[2][2][1], EXP_H1010, 0LL, EXP_H3210, OP_NOP, 0LL, OP_NOP, 0LL);
 
                     mv1_core( 4,  3,  4,  5,  6,  7,  1);
                     mv1_core( 5,  4,  8,  9, 10, 11,  2);

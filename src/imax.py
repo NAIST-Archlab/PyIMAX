@@ -1,6 +1,7 @@
 from pyimax import IMAXArray, sysinit
 import numpy as np
 import datetime
+import threading
 
 
 def generate_2d_array(rows, cols):
@@ -10,32 +11,40 @@ def generate_2d_array(rows, cols):
     array_2d = np.ones((rows, cols), dtype=np.float32)
     return array_2d
 
+def mv_thread(a, b, c, i):
+    c[i] = a.mv(b, i)
+
 def main() -> None:
-    size = 56*20
+    size = 56*10
     # b = np.array(range(size), dtype=np.float32)
     a = generate_2d_array(256, size)
     b = np.ones((size), dtype=np.float32)
-    print(a)
-    print(b)
+    b_i = IMAXArray.from_numpy(b)
     sysinit(4)
-    a_i = IMAXArray.from_numpy(a)
-    b_i = IMAXArray.from_numpy(b)
-    print(a_i)
-    c_i = a_i.mv(b_i)
-    print(a_i)
-    print(b_i)
-    print(c_i)
-    b_i = IMAXArray.from_numpy(b)
-    c_i = a_i.mv(b_i)
-    print(b_i)
-    print(c_i)
-    b_i = IMAXArray.from_numpy(b)
-    c_i = a_i.mv(b_i)
-    print(b_i)
-    print(c_i)
-    b_i = IMAXArray.from_numpy(b)
-    c_i = a_i.mv(b_i)
-    print(IMAXArray.to_numpy(c_i))
+    a_subs = [None] * 4
+    for i in range(4):
+        a_subs[i] = IMAXArray.from_numpy(a[i*64:(i+1)*64,])
+    print(a_subs)
+    c_subs = [None] * 4
+    c_threads = [None] * 4
+    for i in range(4):
+        c_threads[i] = threading.Thread(target=mv_thread, args=(a_subs[i], b_i, c_subs, i))
+        c_threads[i].start()
+    for i in range(4):
+        c_threads[i].join()
+    print(c_subs)
+    for c_sub in c_subs:
+        print(IMAXArray.to_numpy(c_sub))
+    c_subs = [None] * 4
+    c_threads = [None] * 4
+    for i in range(4):
+        c_threads[i] = threading.Thread(target=mv_thread, args=(a_subs[i], b_i, c_subs, i))
+        c_threads[i].start()
+    for i in range(4):
+        c_threads[i].join()
+    print(c_subs)
+    for c_sub in c_subs:
+        print(IMAXArray.to_numpy(c_sub))
     time_init = datetime.datetime.now()
     c = a.dot(b)
     time_delta = datetime.datetime.now() - time_init

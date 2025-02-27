@@ -120,7 +120,7 @@ public:
 
     std::string repr() const;
 
-    IMAXArray mv(const IMAXArray &vector);
+    IMAXArray mv(const IMAXArray &vector, const int threadId);
 
     void change_major();
 private:

@@ -33,8 +33,9 @@ void IMAXArray::numpy_to_imax(py::array array) {
 }
 
 std::string IMAXArray::repr() const {
-    std::string repr_str = "<IMAXArray device_ptr=0x" + 
-                            std::to_string(device_ptr) + ", shape=[";
+    std::stringstream ss;
+    ss << "<IMAXArray device_ptr=0x" << std::hex << device_ptr << ", shape=[";
+    std::string repr_str = ss.str();
     for (size_t i = 0; i < shape.size(); ++i) {
         repr_str += std::to_string(shape[i]);
         if (i < shape.size()-1)
@@ -44,30 +45,33 @@ std::string IMAXArray::repr() const {
     return repr_str;
 }
 
-IMAXArray IMAXArray::mv(const IMAXArray &vector) {
+IMAXArray IMAXArray::mv(const IMAXArray &vector, const int threadId) {
     IMAXArray result({shape[0]}, dtype);
     std::cout << "IMAXArray::mv: shape[0]=" << shape[0] << ", shape[1]=" << shape[1] << std::endl;
     std::cout << "IMAXArray::mv imax_shape[0]=" << imax_shape[0] << ", imax_shape[1]=" << imax_shape[1] << std::endl;
-    if (this.is_row_major) {
-        this.change_major();
+    if (this->is_row_major) {
+        this->change_major();
     }
-    imax_mv((unsigned char*)result.device_ptr, (unsigned char*)device_ptr, (unsigned char*)vector.device_ptr, imax_shape[1], imax_shape[0], 0);
+    imax_mv((unsigned char*)result.device_ptr, (unsigned char*)device_ptr, (unsigned char*)vector.device_ptr, imax_shape[1], imax_shape[0], threadId);
     return result;
 }
 
-void IMAXArray::change_major() const {
+void IMAXArray::change_major() {
     if (imax_shape.size() == 1) {
         return;
     }
-    float *tmp = new float[imax_size];
+    std::cout << "imax_size=" << imax_size << ", imax_nbytes=" << imax_nbytes << std::endl;
+    float* tmp = new float[200000];
+    std::cout << "imax_size=" << imax_size << ", imax_nbytes=" << imax_nbytes << std::endl;
     std::memcpy(tmp, (void *)device_ptr, imax_nbytes);
-    for (size_t i = 0; i < imax_shape[0]; ++i) {
-        for (size_t j = 0; j < imax_shape[1]; ++j) {
-            float *p = (float *)device_ptr;
-            p[(i * imax_shape[1]) + j] = tmp[(j * imax_shape[0]) + i];
+    std::cout << "imax_size=" << imax_size << ", imax_nbytes=" << imax_nbytes << std::endl;
+    float *p = (float *)device_ptr;
+    for (ssize_t i = 0; i < imax_shape[0]; ++i) {
+        for (ssize_t j = 0; j < imax_shape[1]; ++j) {
+            p[(j * imax_shape[0]) + i] = tmp[(i * imax_shape[1]) + j];
         }
     }
-    delete[] tmp;
+    delete tmp;
     is_row_major = !is_row_major;
 }
 
@@ -75,7 +79,7 @@ void IMAXArray::change_major() const {
 #ifdef ARMZYNQ
 std::uintptr_t IMAXArray::global_memory_addr = (std::uintptr_t) 0x0000050000000000LL;
 #else
-std::uintptr_t IMAXArray::global_memory_addr = (std::uintptr_t)(new char[100000]);
+std::uintptr_t IMAXArray::global_memory_addr = (std::uintptr_t)(new char[2000000]);
 #endif
 
 void init_imax_array(pybind11::module &m) {
@@ -102,5 +106,5 @@ void init_imax_array(pybind11::module &m) {
              "Update this IMAXArray from a NumPy array",
              py::arg("array"))
         .def("__repr__", &IMAXArray::repr)
-        .def("mv", &IMAXArray::mv);
+        .def("mv", &IMAXArray::mv, "IMAX MV Kernel", py::arg("vector"), py::arg("threadId") = 0);
 }

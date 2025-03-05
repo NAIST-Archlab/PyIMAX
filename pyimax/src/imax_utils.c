@@ -36,11 +36,11 @@ unsigned char* sysinit(Uint memsize, Uint alignment, Uint threadQty) {
     for (int i = 0; i < threadQty; i++) {
         emax7[i].dma_ctrl = emax_info[i].dma_mmap;
         emax7[i].reg_ctrl = emax_info[i].reg_mmap;
-        ((struct reg_ctrl *)emax7[i].reg_ctrl)->i[i].cmd = CMD_RESET;
+        ((struct reg_ctrl *)emax7[i].reg_ctrl)->i[0].cmd = CMD_RESET;
 #if defined(ARMZYNQ)
         usleep(1);
 #endif
-        switch (((struct reg_ctrl *)emax7[i].reg_ctrl)->i[i].stat >> 8 & 0xf) {
+        switch (((struct reg_ctrl *)emax7[i].reg_ctrl)->i[0].stat >> 8 & 0xf) {
         case 3:
             EMAX_DEPTH = 64;
             break;
@@ -54,8 +54,8 @@ unsigned char* sysinit(Uint memsize, Uint alignment, Uint threadQty) {
             EMAX_DEPTH = 8;
             break;
         }
-        ((struct reg_ctrl *)emax7[i].reg_ctrl)->i[i].adtr = emax_info[i].ddr_mmap - emax_info[i].lmm_phys;
-        ((struct reg_ctrl *)emax7[i].reg_ctrl)->i[i].dmrp = 0LL;
+        ((struct reg_ctrl *)emax7[i].reg_ctrl)->i[0].adtr = emax_info[i].ddr_mmap - emax_info[i].lmm_phys;
+        ((struct reg_ctrl *)emax7[i].reg_ctrl)->i[0].dmrp = 0LL;
     }
 #endif
     return membase;

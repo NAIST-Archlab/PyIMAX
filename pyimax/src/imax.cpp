@@ -6,7 +6,7 @@ namespace py = pybind11;
 void cpp_sysinit(size_t nlane) {
     py::print("sysinit: nlane = ", nlane);
     // std::uintptr_t IMAXArray::global_memory_addr = (std::uintptr_t)(new char[100000]);
-    IMAXArray::global_memory_addr = (std::uintptr_t) sysinit(2000000, 32, nlane);
+    IMAXArray::global_memory_addr = (std::uintptr_t) sysinit(20000000, 32, nlane);
 }
 
 void cpp_execute(const std::string& kernel_name, py::kwargs kwargs) {
